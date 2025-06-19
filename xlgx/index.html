@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>欣了个欣：帮刘雅欣逃出考试周</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
   <style>
     body {
       margin: 0;
@@ -21,6 +22,10 @@
       background-size: contain;
       background-repeat: no-repeat;
       cursor: pointer;
+      transition: transform 0.2s;
+    }
+    .pig:hover {
+      transform: scale(1.1);
     }
     #titleOverlay {
       position: absolute;
@@ -44,6 +49,47 @@
       font-size: 18px;
       z-index: 10;
     }
+    #medalSystem {
+      position: absolute;
+      top: 70px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 18px;
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      max-width: 300px;
+    }
+    .medal {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      margin-right: 2px;
+      margin-bottom: 2px;
+      transition: transform 0.2s;
+    }
+    .medal:hover {
+      transform: scale(1.2);
+    }
+    .medal-bronze {
+      background: linear-gradient(135deg, #cd7f32 0%, #b87333 100%);
+    }
+    .medal-silver {
+      background: linear-gradient(135deg, #c0c0c0 0%, #a9a9a9 100%);
+    }
+    .medal-gold {
+      background: linear-gradient(135deg, #ffd700 0%, #ffcc00 100%);
+    }
+    .medal-diamond {
+      background: linear-gradient(135deg, #b9f2ff 0%, #87ceeb 100%);
+    }
     #message {
       position: absolute;
       top: 50%;
@@ -57,6 +103,7 @@
       text-align: center;
       display: none;
       z-index: 20;
+      max-width: 80%;
     }
     #controls {
       position: absolute;
@@ -69,6 +116,11 @@
     }
     #controls button {
       position: relative;
+      transition: all 0.2s;
+    }
+    #controls button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
     }
     #controls button::after {
       content: attr(data-desc);
@@ -81,16 +133,36 @@
     }
     #startBtnWrapper {
       position: absolute;
-      bottom: 10%; /* 调整开始按钮的位置 */
+      bottom: 10%;
       left: 50%;
       transform: translateX(-50%);
       z-index: 12;
     }
     button {
-      padding: 12px 24px; /* 增大按钮的大小 */
+      padding: 12px 24px;
       font-size: 20px;
       border-radius: 8px;
       color: white;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    #startBtn {
+      background-color: #ec4899;
+    }
+    #restartBtn {
+      background-color: #eab308;
+    }
+    #shuffleBtn {
+      background-color: #3b82f6;
+    }
+    #removeBtn {
+      background-color: #ef4444;
     }
     #gameBoard {
       position: relative;
@@ -98,11 +170,31 @@
       height: 100vh;
       overflow: hidden;
     }
+    .level-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-top: 8px;
+      font-weight: bold;
+    }
+    .level-badge-beginner {
+      background-color: #4ade80;
+      color: #065f46;
+    }
+    .level-badge-intermediate {
+      background-color: #fbbf24;
+      color: #713f12;
+    }
+    .level-badge-advanced {
+      background-color: #f43f5e;
+      color: #881337;
+    }
   </style>
 </head>
 <body>
   <div id="titleOverlay">《欣了个欣：帮刘雅欣逃出考试周》</div>
   <div id="scoreBoard">局数：<span id="round">0</span>｜已逃出的刘雅欣：<span id="score">0</span></div>
+  <div id="medalSystem"></div>
   <div id="gameBoard"></div>
   <div id="message"></div>
 
@@ -129,6 +221,7 @@
   const scoreEl = document.getElementById('score');
   const roundEl = document.getElementById('round');
   const message = document.getElementById('message');
+  const medalSystem = document.getElementById('medalSystem');
   const pigSize = 50;
   const speed = 10;
   const directions = ['up', 'right', 'down', 'left'];
@@ -137,6 +230,26 @@
   let round = 0;
   let shuffleLeft = 2;
   let removeLeft = 2;
+  let totalMedals = 0; // 新增：总奖牌数
+
+  // 获取奖牌类型（根据数量）
+  function getMedalType(index) {
+    if (index < 5) return 'bronze';
+    if (index < 10) return 'silver';
+    if (index < 15) return 'gold';
+    return 'diamond';
+  }
+
+  // 获取奖牌图标
+  function getMedalIcon(type) {
+    const icons = {
+      bronze: '<i class="fa fa-trophy text-xs"></i>',
+      silver: '<i class="fa fa-star text-xs"></i>',
+      gold: '<i class="fa fa-certificate text-xs"></i>',
+      diamond: '<i class="fa fa-diamond text-xs"></i>'
+    };
+    return icons[type] || icons.bronze;
+  }
 
   function getPigCountForRound(r) {
     return 20 + r;
@@ -182,6 +295,13 @@
         pigs = pigs.filter(p => p !== pigData);
         score++;
         scoreEl.textContent = score;
+        
+        // 新增：检查是否达到10只猪，增加奖牌
+        if (score % 10 === 0) {
+          totalMedals++;
+          updateMedalDisplay();
+        }
+        
         if (pigs.filter(p => !p.escaped).length === 0) {
           setTimeout(() => showVictory(), 300);
         }
@@ -264,6 +384,48 @@
     }
   }
 
+  // 更新奖牌显示
+  function updateMedalDisplay() {
+    medalSystem.innerHTML = '';
+    
+    // 添加标题
+    const title = document.createElement('div');
+    title.textContent = '奖牌收藏:';
+    title.style.width = '100%';
+    title.style.marginBottom = '4px';
+    medalSystem.appendChild(title);
+    
+    // 添加奖牌
+    for (let i = 0; i < totalMedals; i++) {
+      const medalType = getMedalType(i);
+      const medal = document.createElement('div');
+      medal.className = `medal medal-${medalType}`;
+      medal.innerHTML = getMedalIcon(medalType);
+      medal.title = `${i + 1}. ${medalType.charAt(0).toUpperCase() + medalType.slice(1)} Medal`;
+      medalSystem.appendChild(medal);
+    }
+    
+    // 添加总数和等级显示
+    const levelInfo = document.createElement('div');
+    levelInfo.style.width = '100%';
+    levelInfo.style.marginTop = '4px';
+    
+    const level = getLevel();
+    const levelName = level <= 10 ? '初级' : level <= 20 ? '中级' : '高级';
+    const levelClass = level <= 10 ? 'level-badge-beginner' : level <= 20 ? 'level-badge-intermediate' : 'level-badge-advanced';
+    
+    levelInfo.innerHTML = `
+      <span style="margin-right: 8px;">总奖牌: ${totalMedals}</span>
+      <span class="level-badge ${levelClass}">等级: ${levelName}</span>
+    `;
+    medalSystem.appendChild(levelInfo);
+  }
+
+  // 获取当前等级
+  function getLevel() {
+    return Math.floor(totalMedals / 2) + 1;
+  }
+
   function startGame() {
     board.innerHTML = '';
     message.style.display = 'none';
@@ -279,7 +441,7 @@
     removeLeft = 2;
     shuffleCountEl.textContent = shuffleLeft;
     removeCountEl.textContent = removeLeft;
-    round++; // 只增加一次局数
+    round++;
     roundEl.textContent = round;
 
     const count = getPigCountForRound(round);
@@ -344,12 +506,25 @@
   }
 
   function showVictory() {
-    // 修复：移除错误的round++
-    message.innerHTML = `🎉 本局成功！当前等级：<strong>${round <= 10 ? '初级' : round <= 20 ? '中级' : '高级'}</strong><br/>点击按钮进入第 ${round + 1} 局`;
+    // 更新胜利消息，包含奖牌信息
+    const level = getLevel();
+    const levelName = level <= 10 ? '初级' : level <= 20 ? '中级' : '高级';
+    const levelClass = level <= 10 ? 'text-green-400' : level <= 20 ? 'text-yellow-400' : 'text-red-400';
+    
+    message.innerHTML = `
+      <div style="font-size: 28px; margin-bottom: 12px;">🎉 本局成功！</div>
+      <div style="margin-bottom: 8px;">本局逃出: <strong>${score}</strong> 只刘雅欣</div>
+      <div style="margin-bottom: 8px;">总奖牌数: <strong>${totalMedals}</strong></div>
+      <div style="margin-bottom: 16px;">当前等级: <span class="${levelClass} font-bold">${levelName}</span></div>
+      <button id="nextRoundBtn" style="background-color: #4f46e5; padding: 8px 16px; border-radius: 4px; cursor: pointer;">点击进入第 ${round + 1} 局</button>
+    `;
+    
+    document.getElementById('nextRoundBtn').onclick = startGame;
     message.style.display = 'block';
-    startBtn.textContent = '下一局';
-    startBtn.style.display = 'block';
   }
+
+  // 初始化奖牌显示
+  updateMedalDisplay();
 
   startBtn.onclick = startGame;
   restartBtn.onclick = startGame;
