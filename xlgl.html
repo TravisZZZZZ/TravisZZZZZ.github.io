@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>欣了个欣：帮刘雅欣逃出考试周</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #a4e372;
+      font-family: sans-serif;
+      overflow: hidden;
+    }
+    .pig {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      background-image: url('https://i.hd-r.icu/70cd5b60c67debaa86e51d8e1ca3e77e.png');
+      background-size: contain;
+      background-repeat: no-repeat;
+      cursor: pointer;
+    }
+    #titleOverlay {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 26px;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 1px 1px 4px #000;
+      z-index: 30;
+    }
+    #scoreBoard {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      background: rgba(0, 0, 0, 0.3);
+      color: white;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 18px;
+      z-index: 10;
+    }
+    #message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 16px 24px;
+      border-radius: 10px;
+      font-size: 22px;
+      text-align: center;
+      display: none;
+      z-index: 20;
+    }
+    #controls {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 11;
+    }
+    #controls button {
+      position: relative;
+    }
+    #controls button::after {
+      content: attr(data-desc);
+      display: block;
+      font-size: 12px;
+      color: #fff;
+      opacity: 0.85;
+      margin-top: 2px;
+      text-align: left;
+    }
+    #startBtnWrapper {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 12;
+    }
+    button {
+      padding: 6px 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      color: white;
+    }
+    #gameBoard {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body>
+  <div id="titleOverlay">《欣了个欣：帮刘雅欣逃出考试周》</div>
+  <div id="scoreBoard">局数：<span id="round">0</span>｜已逃出的刘雅欣：<span id="score">0</span></div>
+  <div id="gameBoard"></div>
+  <div id="message"></div>
+
+  <div id="controls">
+    <button id="restartBtn" class="bg-yellow-500 hidden">重新开始</button>
+    <button id="shuffleBtn" class="bg-blue-500 hidden" data-desc="随机改变所有猪的方向">转向卡（剩余<span id="shuffleCount">2</span>）</button>
+    <button id="removeBtn" class="bg-red-500 hidden" data-desc="随机移除3只猪">清除卡（剩余<span id="removeCount">2</span>）</button>
+  </div>
+
+  <div id="startBtnWrapper">
+    <button id="startBtn" class="bg-pink-500">开始游戏</button>
+  </div>
+
+<script>
+(() => {
+  const board = document.getElementById('gameBoard');
+  const titleOverlay = document.getElementById('titleOverlay');
+  const startBtn = document.getElementById('startBtn');
+  const restartBtn = document.getElementById('restartBtn');
+  const shuffleBtn = document.getElementById('shuffleBtn');
+  const removeBtn = document.getElementById('removeBtn');
+  const shuffleCountEl = document.getElementById('shuffleCount');
+  const removeCountEl = document.getElementById('removeCount');
+  const scoreEl = document.getElementById('score');
+  const roundEl = document.getElementById('round');
+  const message = document.getElementById('message');
+  const pigSize = 50;
+  const speed = 10;
+  const directions = ['up', 'right', 'down', 'left'];
+  let pigs = [];
+  let score = 0;
+  let round = 0;
+  let shuffleLeft = 2;
+  let removeLeft = 2;
+
+  function getPigCountForRound(r) {
+    return 20 + r;
+  }
+
+  function randomPos(max) {
+    return Math.floor(Math.random() * (max - pigSize));
+  }
+
+  function isBlocked(x, y, exclude) {
+    return pigs.some(p => {
+      if (p === exclude || p.escaped) return false;
+      const pSize = p.large ? pigSize * 1.5 : pigSize;
+      const curSize = exclude?.large ? pigSize * 1.5 : pigSize;
+      return Math.abs(p.x + p.size / 2 - x - curSize / 2) < (pSize + curSize) / 2 && Math.abs(p.y + p.size / 2 - y - curSize / 2) < (pSize + curSize) / 2;
+    });
+  }
+
+  function movePig(pigEl, pigData) {
+    if (pigData.moving || pigData.escaped) return;
+    pigData.moving = true;
+    let { x, y, dir } = pigData;
+    const pigSpeed = pigData.large ? speed / 2 : speed;
+
+    function step() {
+      let nextX = x;
+      let nextY = y;
+      if (dir === 'up') nextY -= pigSpeed;
+      else if (dir === 'down') nextY += pigSpeed;
+      else if (dir === 'left') nextX -= pigSpeed;
+      else if (dir === 'right') nextX += pigSpeed;
+
+      if (
+        nextX < 0 ||
+        nextY < 0 ||
+        nextX > window.innerWidth - pigSize ||
+        nextY > window.innerHeight - pigSize
+      ) {
+        pigEl.remove();
+        pigData.escaped = true;
+        pigData.moving = false;
+        pigs = pigs.filter(p => p !== pigData);
+        score++;
+        scoreEl.textContent = score;
+        if (pigs.filter(p => !p.escaped).length === 0) {
+          setTimeout(() => showVictory(), 300);
+        }
+        return;
+      }
+
+      if (isBlocked(nextX, nextY, pigData)) {
+        pigData.moving = false;
+        return;
+      }
+
+      x = nextX;
+      y = nextY;
+      pigData.x = x;
+      pigData.y = y;
+      pigEl.style.left = x + 'px';
+      pigEl.style.top = y + 'px';
+      requestAnimationFrame(step);
+    }
+
+    requestAnimationFrame(step);
+  }
+
+  function createPig(x, y, dir, isLarge = false) {
+    const pig = document.createElement('div');
+    pig.className = 'pig';
+    if (isLarge) {
+      pig.style.width = '75px';
+      pig.style.height = '75px';
+      pig.style.transformOrigin = 'center center';
+    }
+    pig.dataset.dir = dir;
+    pig.style.left = x + 'px';
+    pig.style.top = y + 'px';
+    pig.style.transform = {
+      up: 'rotate(0deg)',
+      right: 'rotate(90deg)',
+      down: 'rotate(180deg)',
+      left: 'rotate(270deg)'
+    }[dir];
+    board.appendChild(pig);
+    const pigSizeActual = isLarge ? pigSize * 1.5 : pigSize;
+    const pigData = { el: pig, x, y, dir, moving: false, escaped: false, large: isLarge, size: pigSizeActual };
+    pigs.push(pigData);
+    pig.onclick = () => movePig(pig, pigData);
+  }
+
+  function shuffleDirections() {
+    if (shuffleLeft <= 0) return;
+    pigs.forEach(p => {
+      if (!p.escaped && !p.moving) {
+        const shuffledDirs = directions.sort(() => Math.random() - 0.5);
+        p.dir = shuffledDirs[0];
+        p.el.style.transform = {
+          up: 'rotate(0deg)',
+          right: 'rotate(90deg)',
+          down: 'rotate(180deg)',
+          left: 'rotate(270deg)'
+        }[p.dir];
+      }
+    });
+    shuffleLeft--;
+    shuffleCountEl.textContent = shuffleLeft;
+  }
+
+  function removeRandomPigs(count = 3) {
+    if (removeLeft <= 0) return;
+    const candidates = pigs.filter(p => !p.escaped && !p.moving);
+    for (let i = 0; i < count && candidates.length > 0; i++) {
+      const idx = Math.floor(Math.random() * candidates.length);
+      const pig = candidates[idx];
+      pig.el.remove();
+      pigs = pigs.filter(p => p !== pig);
+      candidates.splice(idx, 1);
+    }
+    removeLeft--;
+    removeCountEl.textContent = removeLeft;
+  }
+
+  function startGame() {
+    board.innerHTML = '';
+    message.style.display = 'none';
+    titleOverlay.style.display = 'none';
+    score = 0;
+    scoreEl.textContent = score;
+    pigs = [];
+    startBtn.style.display = 'none';
+    restartBtn.classList.remove('hidden');
+    shuffleBtn.classList.remove('hidden');
+    removeBtn.classList.remove('hidden');
+    shuffleLeft = 2;
+    removeLeft = 2;
+    shuffleCountEl.textContent = shuffleLeft;
+    removeCountEl.textContent = removeLeft;
+    round++;
+    roundEl.textContent = round;
+
+    const count = getPigCountForRound(round);
+    let attempts = 0;
+    const maxAttempts = count * 40;
+    const largeCount = Math.floor(count / 4);
+    let largeAssigned = 0;
+    while (pigs.length < count && attempts < maxAttempts) {
+      const radius = Math.sqrt(pigs.length + 1) * 50;
+      const angle = Math.random() * 2 * Math.PI;
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+      const x = centerX + Math.cos(angle) * radius;
+      const y = centerY + Math.sin(angle) * radius;
+
+      const shuffledDirs = directions.sort(() => Math.random() - 0.5);
+      let dir = null;
+      for (let i = 0; i < shuffledDirs.length; i++) {
+        const d = shuffledDirs[i];
+        const isFaceOff = pigs.some(p => {
+          if (p.escaped) return false;
+          const dx = p.x - x;
+          const dy = p.y - y;
+          const opp = (d === 'up' && p.dir === 'down' && Math.abs(dx) < pigSize && dy < 0) ||
+                      (d === 'down' && p.dir === 'up' && Math.abs(dx) < pigSize && dy > 0) ||
+                      (d === 'left' && p.dir === 'right' && Math.abs(dy) < pigSize && dx < 0) ||
+                      (d === 'right' && p.dir === 'left' && Math.abs(dy) < pigSize && dx > 0);
+          return opp;
+        });
+        if (!isFaceOff) {
+          dir = d;
+          break;
+        }
+      }
+
+      if (!dir) {
+        attempts++;
+        continue;
+      }
+
+      const potentialBlock = pigs.some(p => {
+        if (Math.abs(p.x - x) < pigSize && Math.abs(p.y - y) < pigSize) {
+          const opposite = (p.dir === 'up' && dir === 'down' && p.y > y) ||
+                           (p.dir === 'down' && dir === 'up' && p.y < y) ||
+                           (p.dir === 'left' && dir === 'right' && p.x > x) ||
+                           (p.dir === 'right' && dir === 'left' && p.x < x);
+          return opposite;
+        }
+        return false;
+      });
+
+      const newPigSize = largeAssigned < largeCount ? pigSize * 1.5 : pigSize;
+      if (!isBlocked(x, y, { x, y, large: newPigSize > pigSize }) && !potentialBlock && x >= 0 && y >= 0 && x <= window.innerWidth - newPigSize && y <= window.innerHeight - newPigSize) {
+        const isLarge = largeAssigned < largeCount;
+        if (isLarge) largeAssigned++;
+        createPig(x, y, dir, isLarge);
+      }
+      attempts++;
+    }
+  }
+
+  function showVictory() {
+    round++;
+    message.innerHTML = `🎉 本局成功！当前等级：<strong>${round <= 10 ? '初级' : round <= 20 ? '中级' : '高级'}</strong><br/>点击按钮进入第 ${round} 局`;
+    message.style.display = 'block';
+    startBtn.textContent = '下一局';
+    startBtn.style.display = 'block';
+  }
+
+  startBtn.onclick = startGame;
+  restartBtn.onclick = startGame;
+  shuffleBtn.onclick = shuffleDirections;
+  removeBtn.onclick = () => removeRandomPigs(3);
+})();
+</script>
+</body>
+</html>
