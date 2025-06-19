@@ -81,14 +81,14 @@
     }
     #startBtnWrapper {
       position: absolute;
-      bottom: 30px;
+      bottom: 10%; /* 调整开始按钮的位置 */
       left: 50%;
       transform: translateX(-50%);
       z-index: 12;
     }
     button {
-      padding: 6px 12px;
-      font-size: 16px;
+      padding: 12px 24px; /* 增大按钮的大小 */
+      font-size: 20px;
       border-radius: 8px;
       color: white;
     }
@@ -151,7 +151,8 @@
       if (p === exclude || p.escaped) return false;
       const pSize = p.large ? pigSize * 1.5 : pigSize;
       const curSize = exclude?.large ? pigSize * 1.5 : pigSize;
-      return Math.abs(p.x + p.size / 2 - x - curSize / 2) < (pSize + curSize) / 2 && Math.abs(p.y + p.size / 2 - y - curSize / 2) < (pSize + curSize) / 2;
+      // 更精确的碰撞检测
+      return Math.abs(p.x + pSize / 2 - x - curSize / 2) < (pSize + curSize) / 2 && Math.abs(p.y + pSize / 2 - y - curSize / 2) < (pSize + curSize) / 2;
     });
   }
 
@@ -172,8 +173,8 @@
       if (
         nextX < 0 ||
         nextY < 0 ||
-        nextX > window.innerWidth - pigSize ||
-        nextY > window.innerHeight - pigSize
+        nextX > window.innerWidth - (pigData.large ? pigSize * 1.5 : pigSize) ||
+        nextY > window.innerHeight - (pigData.large ? pigSize * 1.5 : pigSize)
       ) {
         pigEl.remove();
         pigData.escaped = true;
@@ -249,7 +250,7 @@
   function removeRandomPigs(count = 3) {
     if (removeLeft <= 0) return;
     const candidates = pigs.filter(p => !p.escaped && !p.moving);
-    for (let i = 0; i < count && candidates.length > 0; i++) {
+    for (let i = 0; i < Math.min(count, candidates.length); i++) {
       const idx = Math.floor(Math.random() * candidates.length);
       const pig = candidates[idx];
       pig.el.remove();
@@ -258,6 +259,9 @@
     }
     removeLeft--;
     removeCountEl.textContent = removeLeft;
+    if (pigs.filter(p => !p.escaped).length === 0) {
+      setTimeout(() => showVictory(), 300);
+    }
   }
 
   function startGame() {
@@ -275,7 +279,7 @@
     removeLeft = 2;
     shuffleCountEl.textContent = shuffleLeft;
     removeCountEl.textContent = removeLeft;
-    round++;
+    round++; // 只增加一次局数
     roundEl.textContent = round;
 
     const count = getPigCountForRound(round);
@@ -299,10 +303,10 @@
           if (p.escaped) return false;
           const dx = p.x - x;
           const dy = p.y - y;
-          const opp = (d === 'up' && p.dir === 'down' && Math.abs(dx) < pigSize && dy < 0) ||
-                      (d === 'down' && p.dir === 'up' && Math.abs(dx) < pigSize && dy > 0) ||
-                      (d === 'left' && p.dir === 'right' && Math.abs(dy) < pigSize && dx < 0) ||
-                      (d === 'right' && p.dir === 'left' && Math.abs(dy) < pigSize && dx > 0);
+          const opp = (d === 'up' && p.dir === 'down' && Math.abs(dx) < (p.large ? pigSize * 1.5 : pigSize) && dy < 0) ||
+                      (d === 'down' && p.dir === 'up' && Math.abs(dx) < (p.large ? pigSize * 1.5 : pigSize) && dy > 0) ||
+                      (d === 'left' && p.dir === 'right' && Math.abs(dy) < (p.large ? pigSize * 1.5 : pigSize) && dx < 0) ||
+                      (d === 'right' && p.dir === 'left' && Math.abs(dy) < (p.large ? pigSize * 1.5 : pigSize) && dx > 0);
           return opp;
         });
         if (!isFaceOff) {
@@ -317,7 +321,9 @@
       }
 
       const potentialBlock = pigs.some(p => {
-        if (Math.abs(p.x - x) < pigSize && Math.abs(p.y - y) < pigSize) {
+        const pSize = p.large ? pigSize * 1.5 : pigSize;
+        const curSize = largeAssigned < largeCount ? pigSize * 1.5 : pigSize;
+        if (Math.abs(p.x - x) < (pSize + curSize) / 2 && Math.abs(p.y - y) < (pSize + curSize) / 2) {
           const opposite = (p.dir === 'up' && dir === 'down' && p.y > y) ||
                            (p.dir === 'down' && dir === 'up' && p.y < y) ||
                            (p.dir === 'left' && dir === 'right' && p.x > x) ||
@@ -338,8 +344,8 @@
   }
 
   function showVictory() {
-    round++;
-    message.innerHTML = `🎉 本局成功！当前等级：<strong>${round <= 10 ? '初级' : round <= 20 ? '中级' : '高级'}</strong><br/>点击按钮进入第 ${round} 局`;
+    // 修复：移除错误的round++
+    message.innerHTML = `🎉 本局成功！当前等级：<strong>${round <= 10 ? '初级' : round <= 20 ? '中级' : '高级'}</strong><br/>点击按钮进入第 ${round + 1} 局`;
     message.style.display = 'block';
     startBtn.textContent = '下一局';
     startBtn.style.display = 'block';
